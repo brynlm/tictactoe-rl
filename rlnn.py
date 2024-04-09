@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import numpy as np
@@ -16,7 +16,7 @@ import os
 
 # define function to allow interactive play with agent
 
-# In[307]:
+# In[3]:
 
 
 def play(policy):
@@ -73,7 +73,7 @@ def play(policy):
 
 # define utility functions for preprocessing and reward
 
-# In[2]:
+# In[4]:
 
 
 def preprocess_data(episode, padding=False, record='p1',conv=False):
@@ -132,59 +132,76 @@ def moving_average(x,size,mult):
 
 
 class RLNN():
-    def __init__(self, alpha, gamma, policy=None):
+    def __init__(self, alpha, gamma, conv=True):
         self.discount = tf.constant([gamma**t for t in range(8)],dtype=tf.float32)
         self.alpha = alpha
         self.gamma = gamma
+        self.conv=conv
+#         self.tensor_spec = tf.TensorSpec(shape=[None,18]) if conv==False else tf.TensorSpec(shape=[None,3,3,1])
+#         self.input_sig = ((tf.TensorSpec(shape=[None]),
+#                                         self.tensor_spec,
+#                                          tf.TensorSpec(shape=None,dtype=tf.int32)),tf.TensorSpec(shape=[None]))
         
         self.V = tf.keras.Sequential()
         self.V.add(tf.keras.layers.Dense(64, activation='relu',kernel_regularizer='l2'))
         self.V.add(tf.keras.layers.Dense(64,activation='relu'))
         self.V.add(tf.keras.layers.Dense(1))#,activation='sigmoid'))
-
-        self.policy = tf.keras.Sequential()
-        self.dense1 = tf.keras.layers.Dense(18, activation='relu', kernel_regularizer='l2')
-#         self.dense2 = tf.keras.layers.Dense(18, kernel_regularizer='l2')
-        self.dense3 = tf.keras.layers.Dense(9,activation='relu')
-        self.logits = tf.keras.layers.Dense(9)
-        self.softmax= tf.keras.layers.Activation(tf.nn.softmax)
         
-#         self.policy.add(self.dense1)
-#         self.policy.add(self.dense3)
-#         self.policy.add(self.logits)
-#         self.policy.add(self.softmax)
-
-        # Experimental CNN for policy:
-        self.C1 = tf.keras.layers.Conv2D(2, (3,3), activation='relu',kernel_regularizer='l2',padding='same')
-        self.C2 = tf.keras.layers.Conv2D(1, (2,2), activation='relu',padding='same')
-        self.D1 = tf.keras.layers.Dense(9)
-        self.flat = tf.keras.layers.Flatten()
-        self.policy.add(self.C1)
-        self.policy.add(self.C2)
-        self.policy.add(self.flat)
-        self.policy.add(self.D1)
-        self.policy.add(self.logits)
-        self.policy.add(self.softmax)
+        self.policy = tf.keras.Sequential()
+        if conv==False:
+            self.dense1 = tf.keras.layers.Dense(18, activation='relu', kernel_regularizer='l2')
+    #         self.dense2 = tf.keras.layers.Dense(18, kernel_regularizer='l2')
+            self.dense3 = tf.keras.layers.Dense(9,activation='relu')
+            self.logits = tf.keras.layers.Dense(9)
+            self.softmax= tf.keras.layers.Activation(tf.nn.softmax)
+            self.policy.add(self.dense1)
+            self.policy.add(self.dense3)
+            self.policy.add(self.logits)
+            self.policy.add(self.softmax)
+        else:
+            self.C1 = tf.keras.layers.Conv2D(2, (3,3), activation='relu',kernel_regularizer='l2',padding='same')
+            self.C2 = tf.keras.layers.Conv2D(1, (2,2), activation='relu',padding='same')
+            self.D1 = tf.keras.layers.Dense(9)
+            self.logits = tf.keras.layers.Dense(9)
+            self.softmax= tf.keras.layers.Activation(tf.nn.softmax)
+            self.flat = tf.keras.layers.Flatten()
+            self.policy.add(self.C1)
+            self.policy.add(self.C2)
+            self.policy.add(self.flat)
+            self.policy.add(self.D1)
+            self.policy.add(self.logits)
+            self.policy.add(self.softmax)
      
     @tf.function
-    def __call__(self, st, conv=False):
+    def __call__(self, st, valid_only=False):
         print('retracing!') # <-- test
         S = tf.cast(st,tf.float32)
-        if conv==False:
+        if self.conv==False:
+            if valid_only==False:
+                return self.policy(st)
             mask = tf.reduce_sum(tf.reshape(st, (2,9)),axis=0)
             probs = self.logits(self.dense3(self.dense1(st)))
             probs = tf.where(mask!=0, -np.inf, probs)
             return tf.nn.softmax(probs)
-#         probs = self.logits(self.D1(self.flat(self.C2(self.C1(tf.expand_dims(S,axis=-1))))))
-#         probs = tf.where(tf.reshape(S,(1,9))!=0,-np.inf,probs)
-#         return tf.nn.softmax(probs)
-        return self.policy(tf.expand_dims(S,axis=-1))
+        if valid_only==False:
+            return self.policy(tf.expand_dims(S,axis=-1))
+        probs = self.logits(self.D1(self.flat(self.C2(self.C1(tf.expand_dims(S,axis=-1))))))
+        probs = tf.where(tf.reshape(S,(1,9))!=0,-np.inf,probs)
+        return tf.nn.softmax(probs)
+
+# need to update to allow optional input_signatures for tf.function 
+#     def specificator(fn):
+#         def decorator(self,episode,discount,baseline):
+#             return tf.function(fn(self, episode,discount,baseline), input_signature=self.input_sig)
+#         return decorator(fn)
+        
 
 # ------------------------------------------------------------------ #    
 # Returns the gradient-log-probabilities multiplied by the reward-to-go, summed over each state-action pair.
     @tf.function(input_signature=((tf.TensorSpec(shape=[None]),
-                                 tf.TensorSpec(shape=[None,3,3,1]),#tf.TensorSpec(shape=[None,18]),
+                                   tf.TensorSpec(shape=[None,3,3,1]),#tf.TensorSpec(shape=[None,18]),
                                  tf.TensorSpec(shape=None,dtype=tf.int32)),tf.TensorSpec(shape=[None])))
+
     def get_pg(self, episode, discount, baseline=False): #, reward_fn, record='p1'):
         print('retracing get_pg()!')
         (A,S,r) = episode
@@ -209,9 +226,10 @@ class RLNN():
             logp = tf.reduce_sum(logp * V)
         grads = tape.gradient(logp, self.policy.variables)
         return grads
-# ------------------------------------------------------------------ #            
+    
+# ------------------------------------------------------------------ #      
 
-    def train(self,opp=None, epochs=100, batch_size=10, reward_fn=reward_fn, baseline=False,conv=False,record='p1'):
+    def train(self,opp=None, epochs=100, batch_size=10, reward_fn=reward_fn, baseline=False,valid_only=False,record='p1'):
         flip = 1
         if record=='p2':
             flip = -1
@@ -233,12 +251,12 @@ class RLNN():
             STATE_DATA=[]
             STATE_VALUES=[]
             if (record=='p1'):
-                batch = [utils.gen_episode(self,p2=opp,record=record,conv=conv) for i in range(batch_size)]
+                batch = [utils.gen_episode(self,p2=opp,record=record,valid_only=valid_only,conv=self.conv) for i in range(batch_size)]
             else:
-                batch = [utils.gen_episode(p1=opp,p2=self,record=record,conv=conv) for i in range(batch_size)]
+                batch = [utils.gen_episode(p1=opp,p2=self,record=record,valid_only=valid_only,conv=self.conv) for i in range(batch_size)]
             for episode in batch:
                 grad_count+= len(episode)-1
-                data = preprocess_data(episode,record=record,conv=conv)
+                data = preprocess_data(episode,record=record,conv=self.conv)
                 discount = tf.constant(self.discount[:len(episode)-1])
                 if baseline==True:
                     STATE_DATA.append(data[1])
@@ -246,7 +264,7 @@ class RLNN():
                     STATE_VALUES.append(np.full((len(episode)-1,), data[2]) * discount)
                 
                 
-                grads = self.get_pg(episode=data,discount=discount,baseline=baseline)#,reward_fn=reward_fn, record=record) # <-- call get_pg()
+                grads = self.get_pg(episode=data,discount=discount,baseline=baseline)
                 if len(g_hat) == 0:
                     g_hat = grads
                 else:
@@ -302,4 +320,5 @@ class RLNN():
         for grad,var in zip(grads,self.V.variables):
             var.assign_sub(lr*grad)
             return loss
+
 

@@ -12,7 +12,7 @@ from tictactoegame import TicTacToe as Board
 # In[5]:
 
 
-def game_step(p1=None, p2=None, start=False, record='p1', conv=False):
+def game_step(p1=None, p2=None, start=False, record='p1', conv=False,valid_only=False):
     board = Board()
     if isinstance(start, type(np.full((3,3),0))):
         board.board=np.copy(start)
@@ -34,10 +34,10 @@ def game_step(p1=None, p2=None, start=False, record='p1', conv=False):
         else:
             if conv==False:
                 S_t = board_to_features(np.copy(board.board))
-                A_t = get_action(tf.squeeze(p1(tf.reshape(S_t, (1,18)))).numpy())
+                A_t = get_action(tf.squeeze(p1(tf.reshape(S_t, (1,18)),valid_only=valid_only)).numpy())
             else:
                 S_t = np.expand_dims(np.copy(board.board), axis=0)
-                A_t = get_action(tf.squeeze(p1(S_t,conv=True)).numpy())
+                A_t = get_action(tf.squeeze(p1(S_t,valid_only=valid_only)).numpy())
             if record=='p1':
                 yield (A_t, np.copy(board.board))
         
@@ -62,10 +62,10 @@ def game_step(p1=None, p2=None, start=False, record='p1', conv=False):
             
         if conv==False:
             S_t = board_to_features(np.copy(board.board)*-1)
-            A_t = get_action(tf.squeeze(p2(tf.reshape(S_t, (1,18)))).numpy())
+            A_t = get_action(tf.squeeze(p2(tf.reshape(S_t, (1,18)),valid_only=valid_only)).numpy())
         else:
             S_t = np.expand_dims(np.copy(board.board)*-1, axis=0)
-            A_t = get_action(tf.squeeze(p2(S_t,conv=True)).numpy())
+            A_t = get_action(tf.squeeze(p2(S_t,valid_only=valid_only)).numpy())
 
         if record=='p2':
             yield (A_t, np.copy(board.board))
@@ -76,9 +76,9 @@ def game_step(p1=None, p2=None, start=False, record='p1', conv=False):
         board.setPiece(A_t, -1)
     return
      
-def gen_episode(p1=None,p2=None, state=np.full((3,3), 0), record='p1',conv=False):
+def gen_episode(p1=None,p2=None, state=np.full((3,3), 0), record='p1',conv=False,valid_only=False):
     episode = []
-    for i in game_step(p1, p2, state, record,conv):
+    for i in game_step(p1, p2, state, record,conv,valid_only):
         episode.append(i)
     return episode
 
