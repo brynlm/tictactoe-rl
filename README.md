@@ -10,4 +10,4 @@ of both.
 
 Here is a learning curve I got from one of the training loops I did:
 
-!()[L2Reg_normal_reward.png]
+![](L2Reg_normal_reward.png)
