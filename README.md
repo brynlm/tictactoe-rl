@@ -7,3 +7,7 @@ usage that I didn't explain well.
 The train function returns a tuple of 4, containing the frequencies with which the agent wins, loses, draws, and *optionally*, makes an "invalid" move. I say optional because in
 the agent's call function, a parameter may be passed to choose whether or not only valid moves should be sampled; I kept both options because I wanted to compare the results
 of both.
+
+Here is a learning curve I got from one of the training loops I did:
+
+!()[L2Reg_normal_reward.png]
