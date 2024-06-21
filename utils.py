@@ -1,16 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
-
 
 import numpy as np
 import tensorflow as tf
 from tictactoegame import TicTacToe as Board
 
-
-# In[5]:
-
+# only function used in here is board_to_features
 
 def game_step(p1=None, p2=None, start=False, record='p1', conv=False,valid_only=False):
     board = Board()
@@ -83,6 +79,7 @@ def gen_episode(p1=None,p2=None, state=np.full((3,3), 0), record='p1',conv=False
     return episode
 
 def board_to_features(board):
+    board = np.copy(board)
     board = tf.reshape(board, [9,1])
     p1_posn = np.asarray((board==1))
     p2_posn = np.asarray((board==-1))
@@ -100,28 +97,11 @@ def one_hot(board):
     
 
 def get_action(probs, batch_size=None):
-#     print(probs)
     probs += 0.000001
     probs /= probs.sum()
     p = np.copy(probs)
-#     print(p)
     a = np.random.choice(9,batch_size, p=p)
     return divmod(a,3)
-#     return a
-
-#     rng = np.random.default_rng()
-#     a = rng.random()
-#     low = 0
-#     for i in range(len(action_probs)):
-#         if action_probs[i] == 0:
-#             continue
-#         if (low <= a and a < action_probs[i] + low):
-#             if i==0:
-#                 return (0,0)
-#             else:
-#                 return divmod(i,3)
-#         else:
-#             low += action_probs[i]
 
 def reward_fn(state):
     board = Board()
@@ -157,10 +137,7 @@ def discounted_return(episode, gamma, reward_fn):
     return ret + reward_fn(episode[-1])
 
 
-"""
-Need to think about and potentially re-implement the expected return calculation.
-Currently, the episode lengths for the "state" value estimates
-"""
+
 def expected_return(state, policy,reward_fn, gamma, return_fn=False, num_trials=100):
     returns = 0
     if return_fn == False:
@@ -175,12 +152,6 @@ def expected_return(state, policy,reward_fn, gamma, return_fn=False, num_trials=
             returns += return_fn(ep, gamma, reward_fn)
     return returns/num_trials
 
-# def expected_return(state, policy, reward_fn=reward_fn, num_trials=100):
-#     reward = 0
-#     for i in range(num_trials):
-#         ep = gen_episode(policy, state)[-1]
-#         reward += reward_fn(ep)
-#     return reward/num_trials
 
 def state_dist(p1,num_trials,p2=None,record='p1', state=np.full((3,3), 0)):
     illegal_moves = 0

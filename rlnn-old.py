@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
 
 
 import numpy as np
@@ -16,9 +15,6 @@ import os
 
 # define function to allow interactive play with agent
 
-# In[3]:
-
-
 def play(policy):
     agent = RLNN(0.1,0.5)
     if isinstance(policy, str):
@@ -31,7 +27,7 @@ def play(policy):
         board = Board()
         board.board
         bot = None
-        player = input('x\'s or o\'s?')# == 'x'
+        player = input('x\'s or o\'s?')
         clear_output()
         if player == 'x':
             bot = 'o'
@@ -72,9 +68,6 @@ def play(policy):
 
 
 # define utility functions for preprocessing and reward
-
-# In[4]:
-
 
 def preprocess_data(episode, padding=False, record='p1',conv=False):
     flip = 1
@@ -128,24 +121,17 @@ def moving_average(x,size,mult):
     return x_prime
 
 
-# In[129]:
-
-
 class RLNN():
-    def __init__(self, alpha, gamma, conv=True):
+    def __init__(self, alpha, gamma, conv=False):
         self.discount = tf.constant([gamma**t for t in range(8)],dtype=tf.float32)
         self.alpha = alpha
         self.gamma = gamma
         self.conv=conv
-#         self.tensor_spec = tf.TensorSpec(shape=[None,18]) if conv==False else tf.TensorSpec(shape=[None,3,3,1])
-#         self.input_sig = ((tf.TensorSpec(shape=[None]),
-#                                         self.tensor_spec,
-#                                          tf.TensorSpec(shape=None,dtype=tf.int32)),tf.TensorSpec(shape=[None]))
-        
+
         self.V = tf.keras.Sequential()
         self.V.add(tf.keras.layers.Dense(64, activation='relu',kernel_regularizer='l2'))
         self.V.add(tf.keras.layers.Dense(64,activation='relu'))
-        self.V.add(tf.keras.layers.Dense(1))#,activation='sigmoid'))
+        self.V.add(tf.keras.layers.Dense(1))
         
         self.policy = tf.keras.Sequential()
         if conv==False:
@@ -188,13 +174,6 @@ class RLNN():
         probs = self.logits(self.D1(self.flat(self.C2(self.C1(tf.expand_dims(S,axis=-1))))))
         probs = tf.where(tf.reshape(S,(1,9))!=0,-np.inf,probs)
         return tf.nn.softmax(probs)
-
-# need to update to allow optional input_signatures for tf.function 
-#     def specificator(fn):
-#         def decorator(self,episode,discount,baseline):
-#             return tf.function(fn(self, episode,discount,baseline), input_signature=self.input_sig)
-#         return decorator(fn)
-        
 
 # ------------------------------------------------------------------ #    
 # Returns the gradient-log-probabilities multiplied by the reward-to-go, summed over each state-action pair.
