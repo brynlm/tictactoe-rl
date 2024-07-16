@@ -11,9 +11,6 @@ from tictactoegame import TicTacToe as Board
 from tictactoegame import Player
 from tictactoegame import RandomMoves
 import matplotlib.pyplot as plt
-from IPython.display import clear_output
-
-import os
 
 # currently, the data generation strategy is inefficient since everything is going to be re-evaluated during the forward pass.
 
@@ -47,7 +44,11 @@ class Agent(Player):
         return action
 
 class Session():
-    def __init__(self,X=None,O=None,lr=1e-3,gamma=0.8):
+    def __init__(self,X=None,O=None,lr=1e-3,gamma=0.8, t_it=10):
+        self.history={'wr':[], 'lr':[], 'dr':[], 'ir':[]}
+        self.t_it=t_it
+        self.it=0 
+        
         self.lr=lr
         self.gamma=gamma
         self.discount=tf.constant([gamma**(gamma-t-1) for t in range(8)],dtype=tf.float32)
@@ -98,7 +99,7 @@ class Session():
     def train_step(self,batch_size=10):
         R=tf.constant([0.0])
         aveG=[]
-        for (S,A),r in self.getDataset().take(batch_size):
+        for (S,A),r in self.getDataset().take(batch_size): # <-- maybe this can be stacked and passed through model all at once
             length=tf.shape(S)[0]
             grads=self.get_pg(S,A,r,self.discount[:length])
             if len(aveG) == 0:
@@ -116,7 +117,6 @@ class Session():
         aveR=[]
         while epoch < epochs:
             print(epoch)
-            clear_output(wait=True)
             aveR.append(self.train_step(batch_size))
             epoch+=1
         return aveR
@@ -134,14 +134,24 @@ class Session():
         
     def __iter__(self): # <-- only record Xs moves, for now.
         self.board.reset()
+        if self.it % self.t_it == 0:
+            for key in self.history:
+                self.history[key].append(0)
+        self.it+=1
         return self
     
     def __next__(self):
-        if self.board.isGameOver(1) or self.board.isGameOver(-1):
+        if self.board.isGameOver(1):
+            self.history['wr'][-1] += 1/self.t_it
+            raise StopIteration
+        if self.board.isGameOver(-1):
+            self.history['lr'][-1] += 1/self.t_it
             raise StopIteration
         if len(self.board.getPosns(9))!=0:
+            self.history['ir'][-1] += 1/self.t_it
             raise StopIteration
         elif len(self.board.getPosns(0)) == 0:
+            self.history['dr'][-1] += 1/self.t_it
             raise StopIteration
         else:
             st,at = utils.board_to_features(self.board.board).T, self.Xs.makeMove(self.board)
